@@ -1,0 +1,58 @@
+name: Auto Create Pull Request
+
+on:
+  push:
+    branches:
+      - 'feature/**'
+      - 'feat/**'
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  create-pr:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - uses: actions/checkout@v4
+      
+    - name: Setup Terraform
+      uses: hashicorp/setup-terraform@v3
+      with:
+        terraform_version: 1.5.7
+        
+    - name: Terraform Init
+      working-directory: ./infra
+      run: terraform init -backend=false
+        
+    - name: Terraform Validate
+      working-directory: ./infra
+      run: terraform validate
+      
+    - name: Create Pull Request
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      run: |
+        BRANCH_NAME=${GITHUB_REF#refs/heads/}
+        
+        # Verifica se já existe PR
+        if gh pr list --head "$BRANCH_NAME" --json number | jq -e '.[0]' > /dev/null 2>&1; then
+          echo "PR já existe para $BRANCH_NAME"
+          exit 0
+        fi
+        
+        # Cria PR simples  
+        echo "Criando PR para $BRANCH_NAME..."
+        gh pr create \
+          --title "[$BRANCH_NAME] Auto-generated PR" \
+          --body "**Pull Request criado automaticamente**
+        
+        **Branch:** \`$BRANCH_NAME\`
+        **Commit:** \`${{ github.sha }}\`
+        
+        Por favor, adicione uma descrição das mudanças realizadas." \
+          --base main \
+          --head "$BRANCH_NAME"
+        
+        echo "PR criado com sucesso!"
