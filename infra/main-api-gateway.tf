@@ -4,14 +4,14 @@ module "api_gateway" {
   api_name        = "${var.project_name}-api-gateway"
   api_description = "API Gateway for Fast Food Authentication System "
 
-  project_name    = var.project_name
-  
+  project_name = var.project_name
+
   lambda_function_name = module.lambda.lambda_function_name
   lambda_invoke_arn    = module.lambda.lambda_function_invoke_arn
-   
-  enable_cors = true
+
+  enable_cors        = true
   cors_allow_origins = ["*"]
-  
+
   throttling_rate_limit  = 1000
   throttling_burst_limit = 2000
 
