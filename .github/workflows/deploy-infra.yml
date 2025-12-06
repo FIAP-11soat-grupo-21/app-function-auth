@@ -1,0 +1,117 @@
+name: Deploy Infrastructure
+
+on:
+  pull_request:
+    branches: [ main ]
+    paths:
+      - 'infra/**'
+      - 'src/**'
+  push:
+    branches: [ main ]
+    paths:
+      - 'infra/**'
+      - 'src/**'
+  workflow_dispatch:
+
+env:
+  AWS_REGION: us-east-1
+  TF_VERSION: 1.5.7
+  S3_TERRAFORM_STATE_BUCKET: tech-challenge-fase04-terraform-state
+  S3_ASSETS_BUCKET: tech-challenge-fase04-assets
+
+jobs:
+  terraform-validate:
+    name: Terraform Validate
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request'
+    
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v4
+      
+    - name: Setup Terraform
+      uses: hashicorp/setup-terraform@v3
+      with:
+        terraform_version: ${{ env.TF_VERSION }}
+        
+    - name: Configure AWS credentials
+      uses: aws-actions/configure-aws-credentials@v4
+      with:
+        aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+        aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+        aws-session-token: ${{ secrets.AWS_SESSION_TOKEN }}
+        aws-region: ${{ env.AWS_REGION }}
+        
+    - name: Terraform Init
+      working-directory: ./infra
+      run: terraform init
+      
+    - name: Terraform Validate
+      working-directory: ./infra
+      run: terraform validate
+      
+    - name: Terraform Format Check
+      working-directory: ./infra
+      run: terraform fmt -check
+  terraform-deploy:
+    name: Terraform Deploy
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v4
+      
+    - name: Setup Terraform
+      uses: hashicorp/setup-terraform@v3
+      with:
+        terraform_version: ${{ env.TF_VERSION }}
+        
+    - name: Configure AWS credentials
+      uses: aws-actions/configure-aws-credentials@v4
+      with:
+        aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+        aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+        aws-session-token: ${{ secrets.AWS_SESSION_TOKEN }}
+        
+    - name: Verify S3 Backend Access
+      run: |
+        echo "Verificando acesso ao bucket S3 S3_TERRAFORM_STATE_BUCKET: ${{ env.S3_TERRAFORM_STATE_BUCKET }}..."
+        aws s3api head-bucket --bucket ${{ env.S3_TERRAFORM_STATE_BUCKET }}
+        
+    - name: Terraform Init
+      working-directory: ./infra
+      run: terraform init
+      
+    - name: Terraform Validate
+      working-directory: ./infra
+      run: terraform validate
+      
+    - name: Setup Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.11'
+
+    - name: Install Lambda dependencies
+      working-directory: ./src/app
+      run: |
+        pip install -r requirements.txt -t .
+
+    - name: Create Lambda ZIP
+      run: |
+        cd src/app
+        zip -r "../../lambda-function.zip" .
+        echo "LAMBDA_ZIP_NAME=lambda-function.zip" >> $GITHUB_ENV
+
+    - name: Upload ZIP to S3
+      run: |
+        aws s3 cp $LAMBDA_ZIP_NAME s3://${{ env.S3_ASSETS_BUCKET }}/$LAMBDA_ZIP_NAME
+        echo "Arquivo atualizado: $LAMBDA_ZIP_NAME no bucket ${{ env.S3_ASSETS_BUCKET }}"
+
+    - name: Terraform Plan
+      working-directory: ./infra
+      run: terraform plan -var-file="terraform.tfvars" -no-color
+
+    - name: Terraform Apply
+      working-directory: ./infra
+      run: terraform apply -var-file="terraform.tfvars" -auto-approve -no-color
