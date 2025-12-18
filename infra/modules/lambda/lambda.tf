@@ -19,6 +19,8 @@ resource "aws_lambda_function" "main" {
   s3_key          = var.lambda_s3_key
   source_code_hash = data.aws_s3_object.lambda_zip.etag
 
+  layers = []
+
   environment {
     variables = var.environment_variables
   }

@@ -1,3 +1,7 @@
+provider "aws" {
+  region = "us-east-2"
+}
+
 terraform {
   required_version = ">= 1.0"
   required_providers {
@@ -13,8 +17,8 @@ terraform {
 
   # Backend S3 para armazenar o estado do Terraform
   backend "s3" {
-    bucket = "tech-challenge-fase04-terraform-state"
-    key    = "cognito/terraform.tfstate"
-    region = "us-east-1"
+    bucket = "fiap-tc-terraform-846874"
+    key    = "tech-challenge-project/auth/terraform.tfstate"
+    region = "us-east-2"
   }
 }

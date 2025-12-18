@@ -6,9 +6,11 @@ resource "aws_cognito_user_pool" "main" {
     allow_admin_create_user_only = var.allow_admin_create_user_only
     
     invite_message_template {
-      email_message = "Bem-vindo {username}! Seu CPF foi cadastrado no sistema."
+      email_message = "Bem-vindo {username}! Seu CPF foi cadastrado no sistema. Sua senha temporária é {####}."
       email_subject = "Cadastro realizado"
-      sms_message   = "Bem-vindo {username}! Seu CPF foi cadastrado no sistema."
+      # AWS requires the SMS invite template to include the {####} placeholder
+      # which will be replaced with the temporary password/code when creating the user.
+      sms_message   = "Bem-vindo {username}! Seu CPF foi cadastrado no sistema. Sua senha temporária é {####}."
     }
   }
 
