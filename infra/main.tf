@@ -3,8 +3,8 @@ module "jwt_function" {
 
   depends_on = [module.cognito]
 
+  api_id = data.terraform_remote_state.infra.outputs.api_gateway_id
   lambda_name = "auth-jwt-function"
-  source_path = "../src/app"
   handler = "lambda_function.lambda_handler"
   runtime = "python3.11"
   subnet_ids = data.terraform_remote_state.infra.outputs.private_subnet_id
@@ -16,15 +16,38 @@ module "jwt_function" {
     }
   )
   vpc_id      = data.terraform_remote_state.infra.outputs.vpc_id
+  memory_size = 512
+  timeout     = 30
 
-  s3_bucket = data.terraform_remote_state.infra.outputs.s3_bucket_name
+  s3_bucket = var.bucket_name
   s3_key = "lambda-function.zip"
+
+  role_permissions = {
+    cognito = {
+        actions = [
+            "cognito-idp:AdminInitiateAuth",
+            "cognito-idp:AdminUserGlobalSignOut",
+            "cognito-idp:ListUsers",
+            "cognito-idp:AdminGetUser"
+        ]
+        resources = ["*"]
+    },
+    ssm = {
+        actions = [
+            "ssm:GetParameter",
+            "ssm:GetParameters"
+        ]
+        resources = [
+            "*"
+        ]
+    }
+  }
 
   tags = data.terraform_remote_state.infra.outputs.project_common_tags
 }
 
 module "cognito" {
-  source = "./modules/cognito"
+  source = "git::https://github.com/FIAP-11soat-grupo-21/infra-core.git//modules/cognito?ref=main"
 
   user_pool_name               = var.cognito_user_pool_name
   project_name                 = var.project_name
@@ -39,16 +62,6 @@ module "cognito" {
   refresh_token_validity       = var.refresh_token_validity
 }
 
-module "jwt_api_gateway" {
-  depends_on = [module.jwt_function]
-
-  source = "git::https://github.com/FIAP-11soat-grupo-21/infra-core.git//modules/API-Gateway-Function-Route?ref=main"
-
-  api_id = data.terraform_remote_state.infra.outputs.api_gateway_id
-  route_key = "POST /{proxy+}"
-  lambda_arn = module.jwt_function.lambda_arn
-}
-
 resource "random_password" "jwt_secret" {
   count   = var.jwt_secret_value == null ? 1 : 0
   length  = 64
@@ -61,4 +74,10 @@ resource "aws_ssm_parameter" "jwt_secret" {
   value = var.jwt_secret_value != null ? var.jwt_secret_value : random_password.jwt_secret[0].result
 
   tags = data.terraform_remote_state.infra.outputs.project_common_tags
+}
+
+resource "aws_apigatewayv2_route" "lambda_route" {
+  api_id    = data.terraform_remote_state.infra.outputs.api_gateway_id
+  route_key = "POST /anonimo/{proxy+}"
+  target    = "integrations/${module.jwt_function.lambda_integration_id}"
 }

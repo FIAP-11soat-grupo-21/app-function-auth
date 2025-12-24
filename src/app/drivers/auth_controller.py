@@ -31,7 +31,8 @@ class AuthController:
             return HttpResponse.error(500, f"Erro interno: {str(e)}")
     
     def _extract_route(self, event: Dict[str, Any]) -> str:
-        route = (event.get("resource") or event.get("path", "")).lower()
+        raw_path = event.get("rawPath") or event.get("path") or event.get("resource", "")
+        route = raw_path.lower()
         return route.split("/")[-1]
     
     def _parse_body(self, event: Dict[str, Any]) -> Dict[str, Any]:
