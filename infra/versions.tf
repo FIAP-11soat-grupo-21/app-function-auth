@@ -15,7 +15,6 @@ terraform {
     }
   }
 
-  # Backend S3 para armazenar o estado do Terraform
   backend "s3" {
     bucket = "fiap-tc-terraform-846874"
     key    = "tech-challenge-project/auth/terraform.tfstate"

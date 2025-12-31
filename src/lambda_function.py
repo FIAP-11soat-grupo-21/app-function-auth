@@ -7,8 +7,6 @@ import hmac
 import boto3
 from botocore.exceptions import ClientError
 
-# ...existing code...
-
 LOG_LEVEL = os.getenv('LOG_LEVEL', 'INFO')
 logger = logging.getLogger(__name__)
 logger.setLevel(LOG_LEVEL)
@@ -17,6 +15,10 @@ COGNITO_CLIENT_ID = os.getenv('COGNITO_CLIENT_ID')
 COGNITO_CLIENT_SECRET = os.getenv('COGNITO_CLIENT_SECRET')
 COGNITO_USER_POOL_ID = os.getenv('COGNITO_USER_POOL_ID')
 AWS_REGION = os.getenv('AWS_REGION')
+# New: when set to a truthy value (1/true/yes), the function will return the response body as a
+# native JSON object (Python dict) instead of a JSON string. This is opt-in to avoid
+# breaking API Gateway proxy integrations which expect a string body.
+RETURN_JSON_OBJECT = os.getenv('RETURN_JSON_OBJECT', 'false').lower() in ('1', 'true', 'yes')
 
 def _calc_secret_hash(email: str, client_id: str, client_secret: str) -> str:
     """Calcula o SECRET_HASH necessário se o App Client tiver Client Secret.
@@ -33,12 +35,29 @@ def _calc_secret_hash(email: str, client_id: str, client_secret: str) -> str:
 
 
 def _response(status_code: int, body: dict):
+    """Retorna a estrutura de resposta da Lambda.
+
+    Por padrão (compatível com API Gateway proxy v2) o `body` é uma string JSON.
+    Se a variável de ambiente RETURN_JSON_OBJECT estiver habilitada, `body` será
+    retornado como um objeto Python (não serializado) — útil para testes locais
+    ou integrações que esperam um JSON real.
+    """
+    headers = {
+        'Content-Type': 'application/json',
+        'Access-Control-Allow-Origin': '*'
+    }
+
+    if RETURN_JSON_OBJECT:
+        return {
+            'statusCode': status_code,
+            'headers': headers,
+            'isBase64Encoded': False,
+            'body': body
+        }
+
     return {
         'statusCode': status_code,
-        'headers': {
-            'Content-Type': 'application/json',
-            'Access-Control-Allow-Origin': '*'
-        },
+        'headers': headers,
         'body': json.dumps(body)
     }
 

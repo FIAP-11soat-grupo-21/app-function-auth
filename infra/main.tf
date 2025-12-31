@@ -1,3 +1,5 @@
+data "aws_region" "current" {}
+
 module "jwt_function" {
   source = "git::https://github.com/FIAP-11soat-grupo-21/infra-core.git//modules/lambda?ref=main"
 
@@ -11,7 +13,7 @@ module "jwt_function" {
     {
       COGNITO_CLIENT_ID     = data.terraform_remote_state.infra.outputs.cognito_user_pool_client_id
       COGNITO_CLIENT_SECRET = data.terraform_remote_state.infra.outputs.cognito_user_pool_client_secret
-      COGNITO_USER_POOL_ID  = data.terraform_remote_state.infra.outputs.cognito_user_pool_id
+      USER_POOL_ID  = data.terraform_remote_state.infra.outputs.cognito_user_pool_id
     }
   )
   vpc_id      = data.terraform_remote_state.infra.outputs.vpc_id
@@ -46,6 +48,17 @@ module "jwt_function" {
 
 resource "aws_apigatewayv2_route" "lambda_route" {
   api_id    = data.terraform_remote_state.infra.outputs.api_gateway_id
-  route_key = "POST /anonimo/{proxy+}"
+  route_key = "POST /auth"
   target    = "integrations/${module.jwt_function.lambda_integration_id}"
+}
+
+resource "aws_apigatewayv2_authorizer" "authorizer" {
+  api_id           = data.terraform_remote_state.infra.outputs.api_gateway_id
+  name             = "CognitoAuthorizer"
+  authorizer_type  = "JWT"
+  identity_sources = ["$request.header.Authorization"]
+  jwt_configuration {
+    audience = [data.terraform_remote_state.infra.outputs.cognito_user_pool_client_id]
+    issuer   = "https://cognito-idp.${data.aws_region.current.name}.amazonaws.com/${data.terraform_remote_state.infra.outputs.cognito_user_pool_id}"
+  }
 }
