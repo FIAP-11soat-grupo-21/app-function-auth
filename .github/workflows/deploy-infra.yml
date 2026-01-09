@@ -53,10 +53,16 @@ jobs:
     - name: Terraform Format Check
       working-directory: ./infra
       run: terraform fmt -check
+
   terraform-deploy:
     name: Terraform Deploy
     runs-on: ubuntu-latest
-    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    env:
+      AWS_REGION: ${{ vars.AWS_REGION }}
+      AWS_ROLE_ARN: ${{ vars.AWS_ROLE_ARN }}
+      GIT_SSH_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
+      GHCR_TOKEN: ${{ secrets.GHCR_TOKEN }}
+      GHCR_USERNAME: ${{ secrets.GHCR_USERNAME }}
     
     steps:
     - name: Checkout
@@ -66,13 +72,19 @@ jobs:
       uses: hashicorp/setup-terraform@v3
       with:
         terraform_version: ${{ env.TF_VERSION }}
-        
+
+    - name: Setup SSH agent for git
+      uses: webfactory/ssh-agent@v0.9.0
+      with:
+        ssh-private-key: ${{ env.GIT_SSH_KEY }}
+
     - name: Configure AWS credentials
       uses: aws-actions/configure-aws-credentials@v4
       with:
         aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
         aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
         aws-session-token: ${{ secrets.AWS_SESSION_TOKEN }}
+        aws-region: ${{ env.AWS_REGION }}
         
     - name: Verify S3 Backend Access
       run: |
@@ -93,13 +105,13 @@ jobs:
         python-version: '3.11'
 
     - name: Install Lambda dependencies
-      working-directory: ./src/app
+      working-directory: ./src
       run: |
         pip install -r requirements.txt -t .
 
     - name: Create Lambda ZIP
       run: |
-        cd src/app
+        cd src
         zip -r "../../lambda-function.zip" .
         echo "LAMBDA_ZIP_NAME=lambda-function.zip" >> $GITHUB_ENV
 
