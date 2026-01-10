@@ -110,12 +110,13 @@ jobs:
         pip install -r requirements.txt -t .
 
     - name: Create Lambda ZIP
+      working-directory: ./src
       run: |
-        cd src
         zip -r "../../lambda-function.zip" .
         echo "LAMBDA_ZIP_NAME=lambda-function.zip" >> $GITHUB_ENV
 
     - name: Upload ZIP to S3
+      working-directory: ./src
       run: |
         aws s3 cp $LAMBDA_ZIP_NAME s3://${{ env.S3_ASSETS_BUCKET }}/$LAMBDA_ZIP_NAME
         echo "Arquivo atualizado: $LAMBDA_ZIP_NAME no bucket ${{ env.S3_ASSETS_BUCKET }}"
