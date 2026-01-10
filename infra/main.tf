@@ -1,7 +1,7 @@
 data "aws_region" "current" {}
 
 module "jwt_function" {
-  source = "git::https://github.com/FIAP-11soat-grupo-21/infra-core.git//modules/lambda?ref=main"
+  source = "git::https://github.com/FIAP-11soat-grupo-21/infra-core.git//modules/Lambda?ref=main"
 
   api_id      = data.terraform_remote_state.infra.outputs.api_gateway_id
   lambda_name = "auth-jwt-function"
