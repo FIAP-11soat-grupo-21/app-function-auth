@@ -122,8 +122,8 @@ jobs:
 
     - name: Terraform Plan
       working-directory: ./infra
-      run: terraform plan -var-file="terraform.tfvars" -no-color
+      run: terraform plan
 
     - name: Terraform Apply
       working-directory: ./infra
-      run: terraform apply -var-file="terraform.tfvars" -auto-approve -no-color
+      run: terraform apply -auto-approve
