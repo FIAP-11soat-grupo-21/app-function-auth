@@ -1,16 +1,7 @@
-name: Terraform - Destroy
+name: Destroy Application from ECS
 
 on:
   workflow_dispatch:
-    inputs:
-      auto_approve:
-        description: "Se true, destrói com -auto-approve (necessário para execução no CI)"
-        required: false
-        default: "true"
-      terraform_version:
-        description: "Versão do Terraform a usar"
-        required: false
-        default: "1.6.6"
 
 permissions:
   id-token: write
@@ -24,8 +15,6 @@ jobs:
       AWS_REGION: ${{ vars.AWS_REGION }}
       AWS_ROLE_ARN: ${{ vars.AWS_ROLE_ARN }}
       GIT_SSH_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
-      GHCR_TOKEN: ${{ secrets.GHCR_TOKEN }}
-      GHCR_USERNAME: ${{ secrets.GHCR_USERNAME }}
 
     steps:
       - name: Checkout repository
@@ -34,7 +23,7 @@ jobs:
       - name: Setup Terraform
         uses: hashicorp/setup-terraform@v2
         with:
-          terraform_version: ${{ github.event.inputs.terraform_version }}
+          terraform_version: "1.6.6"
 
       - name: Setup SSH agent for git
         uses: webfactory/ssh-agent@v0.9.0
@@ -53,26 +42,10 @@ jobs:
         run: |
           terraform init -input=false
 
-      - name: Load tfvars
-        working-directory: infra
-        run: |
-          sed -ie "s|GHCR_USERNAME|${{ env.GHCR_USERNAME }}|g" values.tfvars
-          sed -ie "s|GHCR_TOKEN|${{ env.GHCR_TOKEN }}|g" values.tfvars
-
-      - name: Terraform Plan
-        working-directory: infra
-        run: |
-          terraform plan -input=false -var-file=values.tfvars
-
       - name: Terraform Destroy
         working-directory: infra
         run: |
-          if [ "${{ github.event.inputs.auto_approve }}" = "true" ]; then
-            terraform destroy -input=false -var-file=values.tfvars -auto-approve
-          else
-            echo "auto_approve is false. To run destroy non-interactively set workflow input 'auto_approve' to 'true'. Aborting.";
-            exit 1
-          fi
+          terraform destroy -input=false -var-file=values.tfvars -auto-approve
 
       - name: Done
         run: echo "Terraform destroy finished."
